@@ -3,94 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Barcode Scanner App</title>
-
-<!-- ZXing Library -->
+<title>Ultimate Barcode Scanner</title>
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
-
 <style>
-body {
-  margin:0;
-  font-family: Arial, sans-serif;
-  background:#0f172a;
-  color:white;
-}
-header{
-  background:#1e293b;
-  padding:15px;
-  text-align:center;
-  font-size:20px;
-}
+body{margin:0;font-family:sans-serif;background:#0f172a;color:white}
+header{padding:15px;text-align:center;background:#1e293b}
 .container{padding:15px}
 video{width:100%;border-radius:12px;border:2px solid #38bdf8}
 button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;color:black;cursor:pointer}
-.result-box{margin-top:15px;padding:10px;background:#1e293b;border-radius:10px}
-.history{margin-top:20px}
-.history-item{background:#334155;margin:5px;padding:8px;border-radius:8px}
-.toggle{position:fixed;top:10px;right:10px}
+.result-box,.history{margin-top:15px;padding:10px;background:#1e293b;border-radius:10px}
+.history-item{background:#334155;margin:5px;padding:8px;border-radius:8px;display:flex;align-items:center}
 .light{background:white;color:black}
 .light header{background:#e2e8f0;color:black}
-.light .result-box{background:#e2e8f0}
+.light .result-box,.light .history{background:#e2e8f0}
 </style>
 </head>
 <body>
-<header>📷 PRO Barcode Scanner</header>
+
+<header>📷 Barcode Scanner PRO</header>
 
 <div class="container">
 
 <button onclick="startCamera()">Start Kamera</button>
 <button onclick="stopCamera()">Stop Kamera</button>
 <button onclick="switchCamera()">Switch Kamera</button>
+<button onclick="toggleMode()">Mode</button>
+
 <input type="file" accept="image/*" onchange="scanImage(event)">
 
-<video id="video" autoplay></video>
+<video id="video" autoplay playsinline></video>
 
 <div class="result-box">
 <h3>Hasil:</h3>
-<p id="result">-</p>
+<div id="result">-</div>
 <div id="linkBox"></div>
 </div>
 
 <div class="history">
 <h3>History</h3>
+<button onclick="selectAll()">Pilih Semua</button>
+<button onclick="deleteSelected()">Hapus</button>
 <div id="history"></div>
 </div>
 
 </div>
 
-<button class="toggle" onclick="toggleMode()">Mode</button>
-
 <script>
 let codeReader = new ZXing.BrowserMultiFormatReader();
-let lastScanTime = 0;
-let scanDelay = 1500; // 1.5 detik delay anti spam
-let selectedItems = new Set();
 let currentStream = null;
 let currentDeviceId = null;
+let lastScanTime = 0;
+let delay = 1500;
+let selected = new Set();
 
-function startCamera(){
- navigator.mediaDevices.enumerateDevices().then(devices=>{
-   const videoDevices = devices.filter(d=>d.kind==='videoinput');
-   currentDeviceId = videoDevices[0].deviceId;
-   startDecode(currentDeviceId);
- });
+async function startCamera(){
+ try{
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cams = devices.filter(d=>d.kind==='videoinput');
+  currentDeviceId = cams[0]?.deviceId;
+  startDecode();
+ }catch(e){alert(e)}
 }
 
-function startDecode(deviceId){
- navigator.mediaDevices.getUserMedia({video:{deviceId}})
+function startDecode(){
+ navigator.mediaDevices.getUserMedia({video:{deviceId:currentDeviceId}})
  .then(stream=>{
   currentStream=stream;
+  const video=document.getElementById('video');
   video.srcObject=stream;
-  codeReader.decodeFromVideoDevice(deviceId,'video',(result,err)=>{
-   if(result){
-    handleResult(result.text);
-   }
+
+  codeReader.decodeFromVideoDevice(currentDeviceId,'video',(res,err)=>{
+    if(res){
+      const now=Date.now();
+      if(now-lastScanTime<delay) return;
+      lastScanTime=now;
+      handleResult(res.text);
+    }
   });
- });
+ }).catch(err=>alert('Kamera error: '+err));
 }
 
 function stopCamera(){
@@ -100,61 +91,40 @@ function stopCamera(){
  codeReader.reset();
 }
 
-function switchCamera(){
- navigator.mediaDevices.enumerateDevices().then(devices=>{
-  const cams = devices.filter(d=>d.kind==='videoinput');
-  if(cams.length>1){
-    currentDeviceId = cams[1].deviceId;
-    stopCamera();
-    startDecode(currentDeviceId);
-  }
- });
+async function switchCamera(){
+ const devices = await navigator.mediaDevices.enumerateDevices();
+ const cams = devices.filter(d=>d.kind==='videoinput');
+ if(cams.length>1){
+  currentDeviceId = cams[1].deviceId;
+  stopCamera();
+  startDecode();
+ }
 }
 
 function handleResult(text){
- const now = Date.now();
- if(now - lastScanTime < scanDelay) return;
- lastScanTime = now;
  document.getElementById('result').innerText=text;
- playBeep();
- saveHistory(text);
  showLink(text);
+ saveHistory(text);
+ beep();
 }
 
 function showLink(text){
  let box=document.getElementById('linkBox');
  box.innerHTML='';
-
  if(text.startsWith('http')){
   let a=document.createElement('a');
   a.href=text;
   a.innerText=text;
   a.target='_blank';
-  a.style.display='block';
   box.appendChild(a);
  }
-}
 }
 
 function saveHistory(text){
  let data=JSON.parse(localStorage.getItem('history')||'[]');
  data.unshift(text);
  localStorage.setItem('history',JSON.stringify(data));
- function deleteSelected(){
- let data=JSON.parse(localStorage.getItem('history')||'[]');
- let newData=data.filter((_,i)=>!selectedItems.has(i));
- localStorage.setItem('history',JSON.stringify(newData));
- selectedItems.clear();
  renderHistory();
-}
-
-function selectAll(){
- let data=JSON.parse(localStorage.getItem('history')||'[]');
- selectedItems=new Set(data.map((_,i)=>i));
- renderHistory();
-}
-
-renderHistory();
 }
 
 function renderHistory(){
@@ -162,28 +132,38 @@ function renderHistory(){
  let div=document.getElementById('history');
  div.innerHTML='';
 
- data.forEach((item,index)=>{
+ data.forEach((item,i)=>{
   let d=document.createElement('div');
   d.className='history-item';
 
-  let checkbox=document.createElement('input');
-  checkbox.type='checkbox';
-  checkbox.onchange=(e)=>{
-    if(e.target.checked){
-      selectedItems.add(index);
-    }else{
-      selectedItems.delete(index);
-    }
+  let cb=document.createElement('input');
+  cb.type='checkbox';
+  cb.onchange=e=>{
+    if(e.target.checked) selected.add(i);
+    else selected.delete(i);
   };
 
-  let text=document.createElement('span');
-  text.innerText=' '+item;
+  let span=document.createElement('span');
+  span.innerText=' '+item;
 
-  d.appendChild(checkbox);
-  d.appendChild(text);
+  d.appendChild(cb);
+  d.appendChild(span);
   div.appendChild(d);
  });
-});
+}
+
+function deleteSelected(){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ let newData=data.filter((_,i)=>!selected.has(i));
+ localStorage.setItem('history',JSON.stringify(newData));
+ selected.clear();
+ renderHistory();
+}
+
+function selectAll(){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ selected=new Set(data.map((_,i)=>i));
+ renderHistory();
 }
 
 function scanImage(e){
@@ -197,14 +177,14 @@ function scanImage(e){
   canvas.width=img.width;
   canvas.height=img.height;
   ctx.drawImage(img,0,0);
-  const luminanceSource = new ZXing.RGBLuminanceSource(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
-  const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+
+  const luminance = new ZXing.RGBLuminanceSource(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
+  const binary = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+
   try{
-    const result = new ZXing.MultiFormatReader().decode(binaryBitmap);
+    const result = new ZXing.MultiFormatReader().decode(binary);
     handleResult(result.text);
-  }catch(err){
-    alert('Tidak terbaca');
-  }
+  }catch{alert('Gagal scan')}
  }
 }
 
@@ -212,18 +192,11 @@ function toggleMode(){
  document.body.classList.toggle('light');
 }
 
-function playBeep(){
- const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
- audio.play();
+function beep(){
+ new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg').play();
 }
 
 renderHistory();
-
-// PWA Service Worker
-if('serviceWorker' in navigator){
- navigator.serviceWorker.register('sw.js');
-}
-
 </script>
 
 </body>
