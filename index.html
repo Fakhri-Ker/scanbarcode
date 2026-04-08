@@ -66,6 +66,9 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;
 
 <script>
 let codeReader = new ZXing.BrowserMultiFormatReader();
+let lastScanTime = 0;
+let scanDelay = 1500; // 1.5 detik delay anti spam
+let selectedItems = new Set();
 let currentStream = null;
 let currentDeviceId = null;
 
@@ -109,6 +112,9 @@ function switchCamera(){
 }
 
 function handleResult(text){
+ const now = Date.now();
+ if(now - lastScanTime < scanDelay) return;
+ lastScanTime = now;
  document.getElementById('result').innerText=text;
  playBeep();
  saveHistory(text);
@@ -118,32 +124,66 @@ function handleResult(text){
 function showLink(text){
  let box=document.getElementById('linkBox');
  box.innerHTML='';
+
  if(text.startsWith('http')){
   let a=document.createElement('a');
   a.href=text;
-  a.innerText='Buka Link';
+  a.innerText=text;
   a.target='_blank';
+  a.style.display='block';
   box.appendChild(a);
  }
+}
 }
 
 function saveHistory(text){
  let data=JSON.parse(localStorage.getItem('history')||'[]');
  data.unshift(text);
  localStorage.setItem('history',JSON.stringify(data));
+ function deleteSelected(){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ let newData=data.filter((_,i)=>!selectedItems.has(i));
+ localStorage.setItem('history',JSON.stringify(newData));
+ selectedItems.clear();
  renderHistory();
+}
+
+function selectAll(){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ selectedItems=new Set(data.map((_,i)=>i));
+ renderHistory();
+}
+
+renderHistory();
 }
 
 function renderHistory(){
  let data=JSON.parse(localStorage.getItem('history')||'[]');
  let div=document.getElementById('history');
  div.innerHTML='';
- data.forEach(item=>{
+
+ data.forEach((item,index)=>{
   let d=document.createElement('div');
   d.className='history-item';
-  d.innerText=item;
+
+  let checkbox=document.createElement('input');
+  checkbox.type='checkbox';
+  checkbox.onchange=(e)=>{
+    if(e.target.checked){
+      selectedItems.add(index);
+    }else{
+      selectedItems.delete(index);
+    }
+  };
+
+  let text=document.createElement('span');
+  text.innerText=' '+item;
+
+  d.appendChild(checkbox);
+  d.appendChild(text);
   div.appendChild(d);
  });
+});
 }
 
 function scanImage(e){
