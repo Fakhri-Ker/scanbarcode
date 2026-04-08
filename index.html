@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Barcode Scanner App</title>
+
+<!-- ZXing Library -->
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+<style>
+body {
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#0f172a;
+  color:white;
+}
+header{
+  background:#1e293b;
+  padding:15px;
+  text-align:center;
+  font-size:20px;
+}
+.container{padding:15px}
+video{width:100%;border-radius:12px;border:2px solid #38bdf8}
+button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;color:black;cursor:pointer}
+.result-box{margin-top:15px;padding:10px;background:#1e293b;border-radius:10px}
+.history{margin-top:20px}
+.history-item{background:#334155;margin:5px;padding:8px;border-radius:8px}
+.toggle{position:fixed;top:10px;right:10px}
+.light{background:white;color:black}
+.light header{background:#e2e8f0;color:black}
+.light .result-box{background:#e2e8f0}
+</style>
+</head>
+<body>
+<header>📷 PRO Barcode Scanner</header>
+
+<div class="container">
+
+<button onclick="startCamera()">Start Kamera</button>
+<button onclick="stopCamera()">Stop Kamera</button>
+<button onclick="switchCamera()">Switch Kamera</button>
+<input type="file" accept="image/*" onchange="scanImage(event)">
+
+<video id="video" autoplay></video>
+
+<div class="result-box">
+<h3>Hasil:</h3>
+<p id="result">-</p>
+<div id="linkBox"></div>
+</div>
+
+<div class="history">
+<h3>History</h3>
+<div id="history"></div>
+</div>
+
+</div>
+
+<button class="toggle" onclick="toggleMode()">Mode</button>
+
+<script>
+let codeReader = new ZXing.BrowserMultiFormatReader();
+let currentStream = null;
+let currentDeviceId = null;
+
+function startCamera(){
+ navigator.mediaDevices.enumerateDevices().then(devices=>{
+   const videoDevices = devices.filter(d=>d.kind==='videoinput');
+   currentDeviceId = videoDevices[0].deviceId;
+   startDecode(currentDeviceId);
+ });
+}
+
+function startDecode(deviceId){
+ navigator.mediaDevices.getUserMedia({video:{deviceId}})
+ .then(stream=>{
+  currentStream=stream;
+  video.srcObject=stream;
+  codeReader.decodeFromVideoDevice(deviceId,'video',(result,err)=>{
+   if(result){
+    handleResult(result.text);
+   }
+  });
+ });
+}
+
+function stopCamera(){
+ if(currentStream){
+  currentStream.getTracks().forEach(t=>t.stop());
+ }
+ codeReader.reset();
+}
+
+function switchCamera(){
+ navigator.mediaDevices.enumerateDevices().then(devices=>{
+  const cams = devices.filter(d=>d.kind==='videoinput');
+  if(cams.length>1){
+    currentDeviceId = cams[1].deviceId;
+    stopCamera();
+    startDecode(currentDeviceId);
+  }
+ });
+}
+
+function handleResult(text){
+ document.getElementById('result').innerText=text;
+ playBeep();
+ saveHistory(text);
+ showLink(text);
+}
+
+function showLink(text){
+ let box=document.getElementById('linkBox');
+ box.innerHTML='';
+ if(text.startsWith('http')){
+  let a=document.createElement('a');
+  a.href=text;
+  a.innerText='Buka Link';
+  a.target='_blank';
+  box.appendChild(a);
+ }
+}
+
+function saveHistory(text){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ data.unshift(text);
+ localStorage.setItem('history',JSON.stringify(data));
+ renderHistory();
+}
+
+function renderHistory(){
+ let data=JSON.parse(localStorage.getItem('history')||'[]');
+ let div=document.getElementById('history');
+ div.innerHTML='';
+ data.forEach(item=>{
+  let d=document.createElement('div');
+  d.className='history-item';
+  d.innerText=item;
+  div.appendChild(d);
+ });
+}
+
+function scanImage(e){
+ const file=e.target.files[0];
+ if(!file) return;
+ const img=new Image();
+ img.src=URL.createObjectURL(file);
+ img.onload=()=>{
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=img.width;
+  canvas.height=img.height;
+  ctx.drawImage(img,0,0);
+  const luminanceSource = new ZXing.RGBLuminanceSource(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
+  const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+  try{
+    const result = new ZXing.MultiFormatReader().decode(binaryBitmap);
+    handleResult(result.text);
+  }catch(err){
+    alert('Tidak terbaca');
+  }
+ }
+}
+
+function toggleMode(){
+ document.body.classList.toggle('light');
+}
+
+function playBeep(){
+ const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
+ audio.play();
+}
+
+renderHistory();
+
+// PWA Service Worker
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('sw.js');
+}
+
+</script>
+
+</body>
+</html>
