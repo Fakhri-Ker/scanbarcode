@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Barcode Scanner</title>
+<title>Ultimate Barcode Scanner AI</title>
+
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <style>
@@ -19,15 +20,17 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;
 .light .result-box,.light .history{background:#e2e8f0}
 </style>
 </head>
+
 <body>
 
-<header>📷 Barcode Scanner PRO</header>
+<header>📷 Barcode Scanner AI PRO</header>
 
 <div class="container">
 
 <button onclick="startCamera()">Start Kamera</button>
 <button onclick="stopCamera()">Stop Kamera</button>
 <button onclick="switchCamera()">Switch Kamera</button>
+<button onclick="toggleFlash()">Flash</button>
 <button onclick="toggleMode()">Mode</button>
 
 <input type="file" accept="image/*" onchange="scanImage(event)">
@@ -51,61 +54,60 @@ button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;
 
 <script>
 let codeReader = new ZXing.BrowserMultiFormatReader();
-let currentStream = null;
-let currentDeviceId = null;
-let lastScanTime = 0;
-let delay = 1500;
-let selected = new Set();
+let currentStream=null;
+let currentDeviceId=null;
+let lastScan=0;
+let delay=1500;
+let selected=new Set();
+let track=null;
+let flashOn=false;
 
 async function startCamera(){
- try{
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const cams = devices.filter(d=>d.kind==='videoinput');
-  currentDeviceId = cams[0]?.deviceId;
-  startDecode();
- }catch(e){alert(e)}
+ const devices=await navigator.mediaDevices.enumerateDevices();
+ const cams=devices.filter(d=>d.kind==='videoinput');
+ currentDeviceId=cams[0]?.deviceId;
+ startDecode();
 }
 
 function startDecode(){
  navigator.mediaDevices.getUserMedia({video:{deviceId:currentDeviceId}})
  .then(stream=>{
   currentStream=stream;
-  const video=document.getElementById('video');
+  track=stream.getVideoTracks()[0];
   video.srcObject=stream;
 
-  codeReader.decodeFromVideoDevice(currentDeviceId,'video',(res,err)=>{
-    if(res){
-      const now=Date.now();
-      if(now-lastScanTime<delay) return;
-      lastScanTime=now;
-      handleResult(res.text);
-    }
+  codeReader.decodeFromVideoDevice(currentDeviceId,'video',(res)=>{
+   if(res){
+    let now=Date.now();
+    if(now-lastScan<delay) return;
+    lastScan=now;
+    handleResult(res.text);
+   }
   });
- }).catch(err=>alert('Kamera error: '+err));
+ }).catch(err=>alert(err));
 }
 
 function stopCamera(){
- if(currentStream){
-  currentStream.getTracks().forEach(t=>t.stop());
- }
+ if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
  codeReader.reset();
 }
 
 async function switchCamera(){
- const devices = await navigator.mediaDevices.enumerateDevices();
- const cams = devices.filter(d=>d.kind==='videoinput');
+ const devices=await navigator.mediaDevices.enumerateDevices();
+ const cams=devices.filter(d=>d.kind==='videoinput');
  if(cams.length>1){
-  currentDeviceId = cams[1].deviceId;
+  currentDeviceId=cams[1].deviceId;
   stopCamera();
   startDecode();
  }
 }
 
-function handleResult(text){
+async function handleResult(text){
  document.getElementById('result').innerText=text;
  showLink(text);
  saveHistory(text);
  beep();
+ await processAI(text);
 }
 
 function showLink(text){
@@ -117,6 +119,39 @@ function showLink(text){
   a.innerText=text;
   a.target='_blank';
   box.appendChild(a);
+ }
+}
+
+async function processAI(text){
+ let box=document.getElementById('result');
+
+ // Produk barcode
+ if(/^\\d{8,}$/.test(text)){
+  try{
+   let res=await fetch(`https://world.openfoodfacts.org/api/v0/product/${text}.json`);
+   let data=await res.json();
+
+   if(data.status===1){
+    let p=data.product;
+    box.innerHTML += `
+    <br><b>Produk:</b> ${p.product_name || '-'}
+    <br><b>Brand:</b> ${p.brands || '-'}
+    <br><b>Kategori:</b> ${p.categories || '-'}
+    `;
+   }else{
+    box.innerHTML += `<br>Produk tidak ditemukan`;
+   }
+  }catch{
+   box.innerHTML += `<br>Gagal ambil data`;
+  }
+ }
+
+ // Link
+ else if(text.startsWith('http')){
+  try{
+   let domain=new URL(text).hostname;
+   box.innerHTML += `<br><b>Website:</b> ${domain}`;
+  }catch{}
  }
 }
 
@@ -139,8 +174,8 @@ function renderHistory(){
   let cb=document.createElement('input');
   cb.type='checkbox';
   cb.onchange=e=>{
-    if(e.target.checked) selected.add(i);
-    else selected.delete(i);
+   if(e.target.checked) selected.add(i);
+   else selected.delete(i);
   };
 
   let span=document.createElement('span');
@@ -169,8 +204,10 @@ function selectAll(){
 function scanImage(e){
  const file=e.target.files[0];
  if(!file) return;
+
  const img=new Image();
  img.src=URL.createObjectURL(file);
+
  img.onload=()=>{
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d');
@@ -178,14 +215,31 @@ function scanImage(e){
   canvas.height=img.height;
   ctx.drawImage(img,0,0);
 
-  const luminance = new ZXing.RGBLuminanceSource(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
-  const binary = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+  const lum=new ZXing.RGBLuminanceSource(
+   ctx.getImageData(0,0,canvas.width,canvas.height).data,
+   canvas.width,
+   canvas.height
+  );
+
+  const bin=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
 
   try{
-    const result = new ZXing.MultiFormatReader().decode(binary);
-    handleResult(result.text);
-  }catch{alert('Gagal scan')}
- }
+   let result=new ZXing.MultiFormatReader().decode(bin);
+   handleResult(result.text);
+  }catch{
+   alert('Gagal scan');
+  }
+ };
+}
+
+function toggleFlash(){
+ if(!track) return alert('Kamera belum aktif');
+
+ const cap=track.getCapabilities();
+ if(!cap.torch) return alert('Tidak support');
+
+ flashOn=!flashOn;
+ track.applyConstraints({advanced:[{torch:flashOn}]});
 }
 
 function toggleMode(){
