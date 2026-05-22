@@ -3,53 +3,250 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Barcode Scanner AI</title>
+<title>ScanBarcode by Fakhri</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
 
 <script src="https://unpkg.com/@zxing/library@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 
 <style>
-body{margin:0;font-family:sans-serif;background:#0f172a;color:white}
-header{padding:15px;text-align:center;background:#1e293b}
-.container{padding:15px}
-video{width:100%;border-radius:12px;border:2px solid #38bdf8}
-button{padding:10px;margin:5px;border:none;border-radius:8px;background:#38bdf8;color:black;cursor:pointer}
-.result-box,.history{margin-top:15px;padding:10px;background:#1e293b;border-radius:10px}
-.history-item{background:#334155;margin:5px;padding:8px;border-radius:8px;display:flex;align-items:center}
-.light{background:white;color:black}
-.light header{background:#e2e8f0;color:black}
-.light .result-box,.light .history{background:#e2e8f0}
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:sans-serif;
+}
+
+body{
+background:linear-gradient(135deg,#0f172a,#1e3a8a);
+color:white;
+min-height:100vh;
+padding-bottom:90px;
+}
+
+header{
+padding:20px;
+text-align:center;
+font-size:24px;
+font-weight:bold;
+backdrop-filter:blur(10px);
+background:rgba(255,255,255,0.08);
+border-bottom:1px solid rgba(255,255,255,0.1);
+position:sticky;
+top:0;
+z-index:10;
+}
+
+.container{
+padding:15px;
+}
+
+.card{
+background:rgba(255,255,255,0.08);
+backdrop-filter:blur(15px);
+border:1px solid rgba(255,255,255,0.1);
+padding:15px;
+border-radius:20px;
+margin-bottom:15px;
+box-shadow:0 8px 20px rgba(0,0,0,0.3);
+}
+
+video{
+width:100%;
+border-radius:20px;
+border:2px solid #38bdf8;
+background:black;
+}
+
+.scan-area{
+position:relative;
+overflow:hidden;
+border-radius:20px;
+}
+
+.scan-line{
+position:absolute;
+width:100%;
+height:4px;
+background:red;
+animation:scan 2s linear infinite;
+box-shadow:0 0 15px red;
+}
+
+@keyframes scan{
+0%{top:0}
+100%{top:100%}
+}
+
+button{
+padding:12px;
+border:none;
+border-radius:12px;
+background:#38bdf8;
+color:black;
+font-weight:bold;
+cursor:pointer;
+margin:5px;
+}
+
+input{
+width:100%;
+padding:12px;
+border:none;
+border-radius:12px;
+margin-top:10px;
+}
+
+#result{
+word-break:break-word;
+margin-top:10px;
+line-height:1.7;
+}
+
+.history-item{
+background:rgba(255,255,255,0.08);
+padding:10px;
+border-radius:12px;
+margin-top:8px;
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.bottom-nav{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+background:rgba(15,23,42,0.95);
+display:flex;
+justify-content:space-around;
+padding:12px 0;
+backdrop-filter:blur(15px);
+border-top:1px solid rgba(255,255,255,0.1);
+}
+
+.nav-btn{
+background:none;
+color:white;
+font-size:14px;
+}
+
+.section{
+display:none;
+}
+
+.section.active{
+display:block;
+}
+
+#qrcode{
+margin-top:15px;
+display:flex;
+justify-content:center;
+}
+
+a{
+color:#38bdf8;
+}
+
+.light{
+background:linear-gradient(135deg,#e2e8f0,#cbd5e1);
+color:black;
+}
+
+.light .card,
+.light header,
+.light .bottom-nav{
+background:rgba(255,255,255,0.7);
+color:black;
+}
+
+footer{
+text-align:center;
+padding:20px;
+opacity:0.7;
+}
 </style>
 </head>
 
 <body>
 
-<header>📷 Barcode Scanner AI PRO</header>
+<header>
+📷 ScanBarcode by Fakhri
+</header>
 
 <div class="container">
 
-<button onclick="startCamera()">Start Kamera</button>
-<button onclick="stopCamera()">Stop Kamera</button>
-<button onclick="switchCamera()">Switch Kamera</button>
+<div id="scanSection" class="section active">
+
+<div class="card">
+
+<div class="scan-area">
+<video id="video" autoplay playsinline></video>
+<div class="scan-line"></div>
+</div>
+
+<div style="margin-top:10px">
+<button onclick="startCamera()">Start</button>
+<button onclick="stopCamera()">Stop</button>
+<button onclick="switchCamera()">Switch</button>
 <button onclick="toggleFlash()">Flash</button>
 <button onclick="toggleMode()">Mode</button>
+</div>
 
 <input type="file" accept="image/*" onchange="scanImage(event)">
 
-<video id="video" autoplay playsinline></video>
+</div>
 
-<div class="result-box">
-<h3>Hasil:</h3>
-<div id="result">-</div>
+<div class="card">
+<h2>Hasil Scan</h2>
+<div id="result">Belum ada scan</div>
 <div id="linkBox"></div>
 </div>
 
-<div class="history">
-<h3>History</h3>
+</div>
+
+<div id="historySection" class="section">
+<div class="card">
+<h2>History</h2>
 <button onclick="selectAll()">Pilih Semua</button>
 <button onclick="deleteSelected()">Hapus</button>
 <div id="history"></div>
 </div>
+</div>
 
+<div id="generateSection" class="section">
+<div class="card">
+<h2>Generate QR Code</h2>
+<input type="text" id="qrText" placeholder="Masukkan teks/link">
+<button onclick="generateQR()">Generate</button>
+<div id="qrcode"></div>
+</div>
+</div>
+
+<div id="settingsSection" class="section">
+<div class="card">
+<h2>Settings</h2>
+<p>Total Scan: <span id="totalScan">0</span></p>
+<p>Scan Hari Ini: <span id="todayScan">0</span></p>
+<button onclick="installApp()">Install App</button>
+</div>
+</div>
+
+</div>
+
+<footer>
+Made with ❤️ by Fakhri
+</footer>
+
+<div class="bottom-nav">
+<button class="nav-btn" onclick="showSection('scanSection')">📷 Scan</button>
+<button class="nav-btn" onclick="showSection('historySection')">🕘 History</button>
+<button class="nav-btn" onclick="showSection('generateSection')">🔳 Generate</button>
+<button class="nav-btn" onclick="showSection('settingsSection')">⚙️ Settings</button>
 </div>
 
 <script>
@@ -61,6 +258,12 @@ let delay=1500;
 let selected=new Set();
 let track=null;
 let flashOn=false;
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt',(e)=>{
+ e.preventDefault();
+ deferredPrompt=e;
+});
 
 async function startCamera(){
  const devices=await navigator.mediaDevices.enumerateDevices();
@@ -70,7 +273,9 @@ async function startCamera(){
 }
 
 function startDecode(){
- navigator.mediaDevices.getUserMedia({video:{deviceId:currentDeviceId}})
+ navigator.mediaDevices.getUserMedia({
+  video:{deviceId:currentDeviceId}
+ })
  .then(stream=>{
   currentStream=stream;
   track=stream.getVideoTracks()[0];
@@ -81,20 +286,25 @@ function startDecode(){
     let now=Date.now();
     if(now-lastScan<delay) return;
     lastScan=now;
-    handleResult(res.text);
+
+    handleResult(res.text,res.getBarcodeFormat());
    }
   });
- }).catch(err=>alert(err));
+ })
+ .catch(err=>alert(err));
 }
 
 function stopCamera(){
- if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
+ if(currentStream){
+  currentStream.getTracks().forEach(t=>t.stop());
+ }
  codeReader.reset();
 }
 
 async function switchCamera(){
  const devices=await navigator.mediaDevices.enumerateDevices();
  const cams=devices.filter(d=>d.kind==='videoinput');
+
  if(cams.length>1){
   currentDeviceId=cams[1].deviceId;
   stopCamera();
@@ -102,21 +312,31 @@ async function switchCamera(){
  }
 }
 
-async function handleResult(text){
- document.getElementById('result').innerText=text;
+async function handleResult(text,format='Unknown'){
+ navigator.vibrate(200);
+
+ document.getElementById('result').innerHTML=`
+ <b>Hasil:</b> ${text}
+ <br><b>Format:</b> ${format}
+ `;
+
+ navigator.clipboard.writeText(text);
+
  showLink(text);
  saveHistory(text);
  beep();
+ updateStats();
  await processAI(text);
 }
 
 function showLink(text){
  let box=document.getElementById('linkBox');
  box.innerHTML='';
+
  if(text.startsWith('http')){
   let a=document.createElement('a');
   a.href=text;
-  a.innerText=text;
+  a.innerText='Buka Link';
   a.target='_blank';
   box.appendChild(a);
  }
@@ -125,34 +345,63 @@ function showLink(text){
 async function processAI(text){
  let box=document.getElementById('result');
 
- // Produk barcode
- if(/^\\d{8,}$/.test(text)){
+ if(/^\d{8,}$/.test(text)){
   try{
    let res=await fetch(`https://world.openfoodfacts.org/api/v0/product/${text}.json`);
    let data=await res.json();
 
    if(data.status===1){
     let p=data.product;
+
     box.innerHTML += `
-    <br><b>Produk:</b> ${p.product_name || '-'}
+    <br><br><b>Produk:</b> ${p.product_name || '-'}
     <br><b>Brand:</b> ${p.brands || '-'}
     <br><b>Kategori:</b> ${p.categories || '-'}
     `;
    }else{
-    box.innerHTML += `<br>Produk tidak ditemukan`;
+    box.innerHTML += `<br><br>Produk tidak ditemukan`;
    }
   }catch{
-   box.innerHTML += `<br>Gagal ambil data`;
+   box.innerHTML += `<br><br>Gagal mengambil data`;
   }
  }
 
- // Link
  else if(text.startsWith('http')){
   try{
-   let domain=new URL(text).hostname;
-   box.innerHTML += `<br><b>Website:</b> ${domain}`;
+   let url=new URL(text);
+   let domain=url.hostname;
+
+   box.innerHTML += `<br><br><b>Domain:</b> ${domain}`;
+
+   let suspicious=[
+    'bit.ly',
+    'tinyurl',
+    'grabify',
+    'phishing'
+   ];
+
+   if(suspicious.some(x=>domain.includes(x))){
+    box.innerHTML += `<br><span style='color:red'><b>⚠ Website mencurigakan</b></span>`;
+   }else{
+    box.innerHTML += `<br><span style='color:lightgreen'><b>✔ Website terlihat aman</b></span>`;
+   }
   }catch{}
  }
+
+ else{
+  box.innerHTML += `
+  <br><br>
+  <button onclick="searchGoogle('${text}')">
+  Cari di Google
+  </button>
+  `;
+ }
+}
+
+function searchGoogle(text){
+ window.open(
+  'https://www.google.com/search?q='+encodeURIComponent(text)
+ );
 }
 
 function saveHistory(text){
@@ -173,13 +422,17 @@ function renderHistory(){
 
   let cb=document.createElement('input');
   cb.type='checkbox';
+
   cb.onchange=e=>{
-   if(e.target.checked) selected.add(i);
-   else selected.delete(i);
+   if(e.target.checked){
+    selected.add(i);
+   }else{
+    selected.delete(i);
+   }
   };
 
   let span=document.createElement('span');
-  span.innerText=' '+item;
+  span.innerText=item;
 
   d.appendChild(cb);
   d.appendChild(span);
@@ -190,6 +443,7 @@ function renderHistory(){
 function deleteSelected(){
  let data=JSON.parse(localStorage.getItem('history')||'[]');
  let newData=data.filter((_,i)=>!selected.has(i));
+
  localStorage.setItem('history',JSON.stringify(newData));
  selected.clear();
  renderHistory();
@@ -211,8 +465,10 @@ function scanImage(e){
  img.onload=()=>{
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d');
+
   canvas.width=img.width;
   canvas.height=img.height;
+
   ctx.drawImage(img,0,0);
 
   const lum=new ZXing.RGBLuminanceSource(
@@ -221,11 +477,13 @@ function scanImage(e){
    canvas.height
   );
 
-  const bin=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+  const bin=new ZXing.BinaryBitmap(
+   new ZXing.HybridBinarizer(lum)
+  );
 
   try{
    let result=new ZXing.MultiFormatReader().decode(bin);
-   handleResult(result.text);
+   handleResult(result.text,result.getBarcodeFormat());
   }catch{
    alert('Gagal scan');
   }
@@ -236,7 +494,10 @@ function toggleFlash(){
  if(!track) return alert('Kamera belum aktif');
 
  const cap=track.getCapabilities();
- if(!cap.torch) return alert('Tidak support');
+
+ if(!cap.torch){
+  return alert('Flash tidak support');
+ }
 
  flashOn=!flashOn;
  track.applyConstraints({advanced:[{torch:flashOn}]});
@@ -247,10 +508,66 @@ function toggleMode(){
 }
 
 function beep(){
- new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg').play();
+ new Audio(
+ 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'
+ ).play();
+}
+
+function showSection(id){
+ document.querySelectorAll('.section').forEach(s=>{
+  s.classList.remove('active');
+ });
+
+ document.getElementById(id).classList.add('active');
+}
+
+function generateQR(){
+ let text=document.getElementById('qrText').value;
+ let div=document.getElementById('qrcode');
+
+ div.innerHTML='';
+
+ QRCode.toCanvas(text,function(err,canvas){
+  if(err) return;
+  div.appendChild(canvas);
+ });
+}
+
+function updateStats(){
+ let total=Number(localStorage.getItem('totalScan')||0);
+ total++;
+ localStorage.setItem('totalScan',total);
+
+ let todayKey='scan_'+new Date().toDateString();
+ let today=Number(localStorage.getItem(todayKey)||0);
+ today++;
+ localStorage.setItem(todayKey,today);
+
+ document.getElementById('totalScan').innerText=total;
+ document.getElementById('todayScan').innerText=today;
+}
+
+function loadStats(){
+ let total=Number(localStorage.getItem('totalScan')||0);
+ let todayKey='scan_'+new Date().toDateString();
+ let today=Number(localStorage.getItem(todayKey)||0);
+
+ document.getElementById('totalScan').innerText=total;
+ document.getElementById('todayScan').innerText=today;
+}
+
+async function installApp(){
+ if(deferredPrompt){
+  deferredPrompt.prompt();
+ }
+}
+
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('service-worker.js');
 }
 
 renderHistory();
+loadStats();
 </script>
 
 </body>
