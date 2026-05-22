@@ -460,37 +460,26 @@ function selectAll(){
  renderHistory();
 }
 
-function scanImage(e){
+async function scanImage(e){
  const file=e.target.files[0];
  if(!file) return;
 
  const img=new Image();
  img.src=URL.createObjectURL(file);
 
- img.onload=()=>{
-  const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d');
-
-  canvas.width=img.width;
-  canvas.height=img.height;
-
-  ctx.drawImage(img,0,0);
-
-  const lum=new ZXing.RGBLuminanceSource(
-   ctx.getImageData(0,0,canvas.width,canvas.height).data,
-   canvas.width,
-   canvas.height
-  );
-
-  const bin=new ZXing.BinaryBitmap(
-   new ZXing.HybridBinarizer(lum)
-  );
-
+ img.onload=async ()=>{
   try{
-   let result=new ZXing.MultiFormatReader().decode(bin);
-   handleResult(result.text,result.getBarcodeFormat());
-  }catch{
-   alert('Gagal scan');
+   const reader=new ZXing.BrowserMultiFormatReader();
+   const result=await reader.decodeFromImageElement(img);
+
+   handleResult(
+    result.text,
+    result.getBarcodeFormat()
+   );
+
+  }catch(err){
+   alert('QR / Barcode gagal dibaca');
+   console.error(err);
   }
  };
 }
