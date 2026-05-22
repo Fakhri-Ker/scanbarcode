@@ -164,6 +164,10 @@ background:rgba(255,255,255,0.7);
 color:black;
 }
 
+.light .nav-btn{
+color:black;
+}
+
 footer{
 text-align:center;
 padding:20px;
@@ -223,6 +227,7 @@ opacity:0.7;
 <h2>Generate QR Code</h2>
 <input type="text" id="qrText" placeholder="Masukkan teks/link">
 <button onclick="generateQR()">Generate</button>
+<button onclick="downloadQR()">Download QR</button>
 <div id="qrcode"></div>
 </div>
 </div>
@@ -529,8 +534,23 @@ function generateQR(){
 
  QRCode.toCanvas(text,function(err,canvas){
   if(err) return;
+
+  canvas.id='generatedCanvas';
   div.appendChild(canvas);
  });
+}
+
+function downloadQR(){
+ let canvas=document.getElementById('generatedCanvas');
+
+ if(!canvas){
+  return alert('Generate QR terlebih dahulu');
+ }
+
+ let link=document.createElement('a');
+ link.download='ScanBarcode-by-Fakhri-QR.png';
+ link.href=canvas.toDataURL('image/png');
+ link.click();
 }
 
 function updateStats(){
